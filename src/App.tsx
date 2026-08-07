@@ -9,8 +9,10 @@ import { BotStatsModal } from './components/BotStatsModal';
 import { TelegramMessage, OsintReport, PartialSearchParams, UserStats } from './types';
 import { SAMPLE_REPORTS } from './sampleData';
 import { Search, Sparkles, FileText, Phone, UserCheck, ShieldAlert, ArrowRight } from 'lucide-react';
+import { useAuth } from './components/AuthContext';
 
 export default function App() {
+  const { user, signInWithGoogle, getToken, loading: authLoading } = useAuth();
   const [activeView, setActiveView] = useState<'telegram' | 'sherlock' | 'presets'>('telegram');
   const [currentReport, setCurrentReport] = useState<OsintReport | null>(SAMPLE_REPORTS['380933745829']);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,9 +63,17 @@ export default function App() {
   const executeSearch = async (queryStr: string, partialParams?: PartialSearchParams, photoBase64?: string) => {
     setIsLoading(true);
     try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Необходима авторизация. Войдите через Google.');
+      }
+      
       const response = await fetch('/api/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           query: queryStr,
           queryType: photoBase64 ? 'photo' : partialParams ? 'name' : 'phone',
@@ -173,6 +183,36 @@ export default function App() {
   const handleBuySuccess = (added: number) => {
     setUserStats((prev) => ({ ...prev, queriesLeft: prev.queriesLeft + added }));
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0b0f17] flex items-center justify-center text-cyan-400">
+        <Sparkles className="w-8 h-8 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0b0f17] flex flex-col items-center justify-center text-gray-100 font-sans p-4">
+        <div className="max-w-md w-full bg-[#131d2a] border border-[#233345] rounded-2xl p-8 text-center space-y-6 shadow-xl">
+          <div className="w-16 h-16 bg-cyan-900/30 rounded-full flex items-center justify-center mx-auto border border-cyan-500/20">
+            <ShieldAlert className="w-8 h-8 text-cyan-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Доступ закрыт</h2>
+          <p className="text-gray-400 text-sm">
+            Для использования All-Seeing Search Bot необходимо авторизоваться в системе.
+          </p>
+          <button
+            onClick={signInWithGoogle}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-cyan-900/20"
+          >
+            Войти через Google
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0f17] text-gray-100 flex flex-col font-sans selection:bg-purple-500 selection:text-white">

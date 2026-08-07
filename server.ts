@@ -3,6 +3,10 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { SAMPLE_REPORTS } from "./src/sampleData";
+import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
+import { getOrCreateUser } from './src/db/users.ts';
+import { db } from './src/db/index.ts';
+import { searchHistory } from './src/db/schema.ts';
 
 const app = express();
 const PORT = 3000;
@@ -31,12 +35,22 @@ function getGeminiClient() {
 }
 
 // OSINT Search API
-app.post("/api/search", async (req, res) => {
+app.post("/api/search", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const userRecord = await getOrCreateUser(req.user!.uid, req.user!.email || 'unknown@example.com');
     const { query, queryType, partialParams, faceImage } = req.body;
 
     // Clean phone query for matching sample
     const cleanedDigits = (query || '').replace(/\D/g, '');
+
+    // Record search history in Cloud SQL
+    await db.insert(searchHistory).values({
+      userId: userRecord.id,
+      query: query || 'Unknown',
+      queryType: queryType || 'phone',
+    }).catch(err => {
+      console.error("Failed to log search history:", err);
+    });
 
     // 1. Check exact sample database first for instant 100% screenshot accuracy
     if (cleanedDigits && SAMPLE_REPORTS[cleanedDigits]) {
@@ -71,7 +85,7 @@ Include believable details suitable for the country indicated (e.g. Russia, Ukra
 Return ONLY valid JSON.`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-1.5-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
