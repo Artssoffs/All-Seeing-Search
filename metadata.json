@@ -1,0 +1,6 @@
+{
+  "name": "All-Seeing Search Telegram Bot",
+  "description": "Telegram AI-powered OSINT search bot and report generator for aggregated telephone, identity, domain, vehicle, and digital footprint intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
