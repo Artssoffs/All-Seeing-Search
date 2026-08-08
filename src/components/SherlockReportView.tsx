@@ -19,7 +19,10 @@ import {
   MessageSquare,
   ExternalLink,
   Check,
-  Filter
+  Filter,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles
 } from 'lucide-react';
 import { OsintReport } from '../types';
 
@@ -28,6 +31,24 @@ interface Props {
   onClose: () => void;
   onNewSearchClick?: () => void;
 }
+
+const SensitivityBadge: React.FC<{ level: 'public' | 'private' | 'confidential' }> = ({ level }) => {
+  const styles = {
+    public: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    private: 'bg-orange-50 text-orange-700 border-orange-200',
+    confidential: 'bg-red-50 text-red-700 border-red-200'
+  };
+  const labels = {
+    public: '🟢 Публичные',
+    private: '🟠 Частные',
+    confidential: '🔴 Конфиденциально'
+  };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ml-2 shadow-sm whitespace-nowrap flex items-center shrink-0 ${styles[level]}`}>
+      {labels[level]}
+    </span>
+  );
+};
 
 export const SherlockReportView: React.FC<Props> = ({
   report,
@@ -39,6 +60,7 @@ export const SherlockReportView: React.FC<Props> = ({
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string | null>(null);
   const [searchTableQuery, setSearchTableQuery] = useState('');
+  const [rating, setRating] = useState<'up' | 'down' | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     summary: true,
     profiles: true,
@@ -177,6 +199,39 @@ All-Seeing Search Report for ${report.query}
           </div>
         </div>
 
+        {/* Executive Summary */}
+        {report.executiveSummary && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-20 pointer-events-none">
+              <Sparkles className="w-16 h-16 text-indigo-500" />
+            </div>
+            <div className="flex items-start gap-3 relative z-10">
+              <div className="mt-1 flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-indigo-900 mb-1">Краткая AI-сводка</h3>
+                <p className="text-sm text-indigo-800 leading-relaxed font-medium">
+                  {report.executiveSummary}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Sensitivity Legend */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-gray-400" />
+            <span className="text-sm font-semibold text-gray-700">Чувствительность данных:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SensitivityBadge level="public" />
+            <SensitivityBadge level="private" />
+            <SensitivityBadge level="confidential" />
+          </div>
+        </div>
+
         {/* Action Buttons Row (Screenshots 4 & 5) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {/* Actions Dropdown */}
@@ -285,6 +340,7 @@ All-Seeing Search Report for ${report.query}
             <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
               <Globe className="w-5 h-5 text-indigo-600" />
               <span>Профили в интернете</span>
+              <SensitivityBadge level="public" />
             </h3>
             {expandedSections.profiles ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
@@ -321,9 +377,12 @@ All-Seeing Search Report for ${report.query}
             onClick={() => toggleSection('tags')}
             className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-2"
           >
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-              <User className="w-5 h-5 text-cyan-600" />
-              <span>Возможные имена <span className="text-gray-400 font-normal text-sm">({report.phonebookTags.length})</span></span>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-cyan-600" />
+                <span>Возможные имена <span className="text-gray-400 font-normal text-sm">({report.phonebookTags.length})</span></span>
+              </div>
+              <SensitivityBadge level="private" />
             </h3>
             {expandedSections.tags ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
@@ -357,9 +416,12 @@ All-Seeing Search Report for ${report.query}
               onClick={() => toggleSection('support')}
               className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-2"
             >
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-amber-600" />
-                <span>Обращение в поддержку {report.supportTickets[0]?.year}</span>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-amber-600" />
+                  <span>Обращение в поддержку {report.supportTickets[0]?.year}</span>
+                </div>
+                <SensitivityBadge level="confidential" />
               </h3>
               {expandedSections.support ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
             </div>
@@ -413,9 +475,12 @@ All-Seeing Search Report for ${report.query}
             onClick={() => toggleSection('addresses')}
             className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-2"
           >
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-emerald-600" />
-              <span>Адреса <span className="text-gray-400 font-normal text-sm">({report.addresses.length})</span></span>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+                <span>Адреса <span className="text-gray-400 font-normal text-sm">({report.addresses.length})</span></span>
+              </div>
+              <SensitivityBadge level="private" />
             </h3>
             {expandedSections.addresses ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
@@ -486,9 +551,12 @@ All-Seeing Search Report for ${report.query}
             onClick={() => toggleSection('sites')}
             className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-2"
           >
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-600" />
-              <span>Сайты, где найдены регистрации</span>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-600" />
+                <span>Сайты, где найдены регистрации</span>
+              </div>
+              <SensitivityBadge level="public" />
             </h3>
             {expandedSections.sites ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
@@ -529,11 +597,14 @@ All-Seeing Search Report for ${report.query}
             onClick={() => toggleSection('banks')}
             className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-2"
           >
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-rose-600" />
-              <span>
-                Клиенты и Базы данных <span className="text-gray-400 font-normal text-sm">({filteredLeakedRecords.length})</span>
-              </span>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-rose-600" />
+                <span>
+                  Клиенты и Базы данных <span className="text-gray-400 font-normal text-sm">({filteredLeakedRecords.length})</span>
+                </span>
+              </div>
+              <SensitivityBadge level="confidential" />
             </h3>
             {expandedSections.banks ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
@@ -630,6 +701,41 @@ All-Seeing Search Report for ${report.query}
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* Rating Section */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col items-center justify-center space-y-4">
+          <h3 className="text-lg font-bold text-gray-900">Оцените результат поиска</h3>
+          <p className="text-sm text-gray-500 text-center max-w-md">Ваша оценка помогает нам улучшать качество поиска и находить более точные данные.</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setRating('up')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all border ${
+                rating === 'up'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <ThumbsUp className={`w-5 h-5 ${rating === 'up' ? 'fill-current' : ''}`} />
+              Полезно
+            </button>
+            <button
+              onClick={() => setRating('down')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all border ${
+                rating === 'down'
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <ThumbsDown className={`w-5 h-5 ${rating === 'down' ? 'fill-current' : ''}`} />
+              Неточно
+            </button>
+          </div>
+          {rating && (
+            <p className="text-sm text-emerald-600 font-medium bg-emerald-50 px-4 py-2 rounded-xl mt-2">
+              Спасибо за вашу оценку!
+            </p>
           )}
         </div>
 

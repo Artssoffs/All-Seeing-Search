@@ -81,11 +81,12 @@ Include believable details suitable for the country indicated (e.g. Russia, Ukra
 6. addresses: 2-4 delivery/registration addresses with count and frequency percentage.
 7. registeredSites: badges for websites (e.g., bon.ua, avito.ru, cdek.ru, privatbank.ua, vk.com, t.me).
 8. realEstate & vehicles: optional cadastral numbers or auto VIN/plates.
+9. executiveSummary: A short summary (2-4 sentences) highlighting the most critical findings, such as potential fraud, exposed credentials, suspicious tags, or compromised databases.
 
 Return ONLY valid JSON.`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-3.5-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -96,6 +97,7 @@ Return ONLY valid JSON.`;
                 query: { type: Type.STRING },
                 queryType: { type: Type.STRING },
                 timestamp: { type: Type.STRING },
+                executiveSummary: { type: Type.STRING },
                 basicInfo: {
                   type: Type.OBJECT,
                   properties: {
@@ -215,6 +217,7 @@ Return ONLY valid JSON.`;
       query: displayQuery,
       queryType: queryType || 'phone',
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      executiveSummary: "В ходе проверки выявлено несколько совпадений в базах утечек данных (Авито/СДЭК/ПриватБанк). Обнаружены теги, указывающие на возможную коммерческую деятельность («Дроп», «Заказ»). Пароли в открытом виде не найдены.",
       basicInfo: {
         phone: cleanedDigits || '380991234567',
         formattedPhone: query || '+380 99 123 45 67',
@@ -272,6 +275,58 @@ Return ONLY valid JSON.`;
   } catch (error: any) {
     console.error("Search error:", error);
     return res.status(500).json({ success: false, error: error.message || "Search failed" });
+  }
+});
+
+// General Chat API with Thinking Mode, Image Analysis, and Google Search
+app.post("/api/chat", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { message, image, history, isComplex } = req.body;
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    const contents: any[] = [];
+    
+    // Convert history format if needed, but here we just append the current user message + image
+    if (image) {
+      // image is expected to be a base64 string "data:image/jpeg;base64,..."
+      const mimeType = image.split(';')[0].split(':')[1];
+      const data = image.split(',')[1];
+      contents.push({
+        inlineData: {
+          mimeType,
+          data
+        }
+      });
+    }
+    
+    if (message) {
+      contents.push({ text: message });
+    }
+    
+    const isImageUpload = !!image;
+    
+    // Choose model based on whether it is a complex query or image upload
+    const modelName = isImageUpload || isComplex ? "gemini-3.1-pro-preview" : "gemini-3.5-flash";
+    
+    // Construct config
+    const config: any = {
+      tools: [{ googleSearch: {} }]
+    };
+    
+    if (isComplex) {
+       config.thinkingConfig = { thinkingLevel: "HIGH" };
+    }
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: { parts: contents },
+      config
+    });
+
+    return res.json({ success: true, text: response.text });
+  } catch (error: any) {
+    console.error("Chat error:", error);
+    return res.status(500).json({ success: false, error: error.message || "Chat failed" });
   }
 });
 

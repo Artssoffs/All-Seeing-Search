@@ -77,6 +77,7 @@ export interface OsintReport {
     age?: number;
     avatarUrl?: string;
   };
+  executiveSummary?: string;
   phonebookTags: string[];
   socialProfiles: SocialProfile[];
   interestedCount: number;

@@ -86,7 +86,15 @@ export default function App() {
         throw new Error(`Ошибка сервера (код ${response.status})`);
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Search API returned non-JSON:", responseText);
+        throw new Error("Сервер вернул некорректный ответ (не JSON).");
+      }
+
       if (data.success && data.report) {
         const report: OsintReport = data.report;
         setCurrentReport(report);
@@ -142,6 +150,78 @@ export default function App() {
     }
   };
 
+  const executeChat = async (text: string, photoBase64?: string) => {
+    setIsLoading(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Необходима авторизация.');
+      
+      const timeNow = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const userMsgText = photoBase64 ? (text ? `📷 ${text}` : '📷 [Загружено изображение]') : text;
+      
+      const newMsgUser: TelegramMessage = {
+        id: `msg_u_${Date.now()}`,
+        sender: 'user',
+        text: userMsgText,
+        time: timeNow,
+      };
+      
+      setMessages((prev) => [...prev, newMsgUser]);
+      
+      const isComplex = text.toLowerCase().includes('подумай') || text.toLowerCase().includes('сложн');
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: text,
+          image: photoBase64,
+          isComplex
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Ошибка сервера`);
+      
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Chat API returned non-JSON:", responseText);
+        throw new Error("Сервер вернул некорректный ответ (не JSON).");
+      }
+
+      if (data.success && data.text) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg_b_${Date.now()}`,
+            sender: 'bot',
+            text: data.text,
+            time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      } else {
+        throw new Error(data.error || 'Ошибка ответа чата');
+      }
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_err_${Date.now()}`,
+          sender: 'bot',
+          text: `⚠️ Ошибка: ${err?.message || 'Неизвестная ошибка'}`,
+          time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSendMessage = (text: string, photoBase64?: string) => {
     if (text === '/start') {
       setMessages((prev) => [
@@ -167,7 +247,16 @@ export default function App() {
       ]);
       return;
     }
-    executeSearch(text, undefined, photoBase64);
+    
+    // Determine if we should do OSINT search or general chat
+    // OSINT: phone numbers, INN, simple name queries without conversational words
+    const isOsintQuery = /^[\+\d\s\-\(\)]+$/.test(text) || text.toLowerCase().includes('инн') || (!photoBase64 && text.split(' ').length <= 3 && !text.toLowerCase().includes('подумай'));
+    
+    if (isOsintQuery && !photoBase64) {
+      executeSearch(text);
+    } else {
+      executeChat(text, photoBase64);
+    }
   };
 
   const handlePartialSearch = (params: PartialSearchParams) => {
