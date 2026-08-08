@@ -12,8 +12,8 @@ from osint_tools import analyze_phone, analyze_ip
 logging.basicConfig(level=logging.INFO)
 
 # Получаем токены из переменных окружения
-BOT_TOKEN = os.environ.get("8756287075:AAHsk9W1X9eWGbJ1zfxQgFDzQvvZxir4Wnc")
-GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6Kt898P_MiozyYgCt1xob_zQQfAGUvnTa9C8WlOBc0CEg")
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not BOT_TOKEN or not GEMINI_API_KEY:
     logging.error("Необходимо установить переменные окружения TELEGRAM_BOT_TOKEN и GEMINI_API_KEY")
